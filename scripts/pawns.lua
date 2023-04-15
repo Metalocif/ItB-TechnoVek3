@@ -16,6 +16,7 @@ local files = {
 	"Meta_TechnoDigger_broken.png",
 	"Meta_TechnoDigger_ns.png",
 	"Meta_TechnoDigger_h.png",
+	"Meta_TechnoDigger_emerge.png",
 }
 for _, file in ipairs(files) do
 	modApi:appendAsset("img/units/player/".. file, mechPath .. file)
@@ -27,6 +28,7 @@ local a=ANIMS
 	a.Meta_TechnoDigger_broken = a.MechUnit:new{Image="units/player/Meta_TechnoDigger_broken.png", PosX = -22, PosY = 4 }
 	a.Meta_TechnoDiggerw_broken = a.MechUnit:new{Image="units/player/Meta_TechnoDigger_w_broken.png", PosX = -20, PosY = 10 }
 	a.Meta_TechnoDigger_ns = a.MechIcon:new{Image="units/player/Meta_TechnoDigger_ns.png"}
+	a.Meta_TechnoDiggere = a.MechIcon:new{Image="units/player/Meta_TechnoDigger_emerge.png", PosX = -20, PosY = 4, Loop = false, NumFrames = 10, Time = .07}
 
 -- make a list of our files.
 local files = {
@@ -114,7 +116,7 @@ Meta_TechnoDigger = Pawn:new{
 	SkillList = {"Meta_TechnoDiggerWeapon"},
 
 	-- movement sounds.
-	SoundLocation = "/enemy/digger_1/",
+	SoundLocation = "/enemy/digger_2/",
 
 	-- who will be controlling this unit.
 	DefaultTeam = TEAM_PLAYER,
@@ -124,6 +126,57 @@ Meta_TechnoDigger = Pawn:new{
 
 }
 AddPawn("Meta_TechnoDigger")
+
+local oldMove = Move.GetTargetArea
+function Move:GetTargetArea(p, ...)
+	local mover = Board:GetPawn(p)
+	if mover and mover:GetType() == "Meta_TechnoDigger" then
+		local old = extract_table(Board:GetReachable(p, mover:GetMoveSpeed(), PATH_FLYER))
+		local ret = PointList()
+
+		for _, v in ipairs(old) do
+			local terrain = Board:GetTerrain(v)
+
+			if terrain ~= TERRAIN_HOLE and terrain ~= TERRAIN_WATER then
+				ret:push_back(v)
+			end
+		end
+
+		return ret
+	end
+
+	return oldMove(self, p, ...)
+end
+
+local oldMove = Move.GetSkillEffect
+function Move:GetSkillEffect(p1, p2, ...)
+	local mover = Board:GetPawn(p1)
+	if mover and mover:GetType() == "Meta_TechnoDigger" then
+		local ret = SkillEffect()
+		local pawnId = mover:GetId()
+
+		-- just preview move.
+		-- ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", pawnId))
+		if not Board:IsTerrain(p1, TERRAIN_WATER) and not Board:IsTerrain(p2, TERRAIN_WATER) then
+			ret:AddBurrow(Board:GetPath(p1, p2, PATH_FLYER), NO_DELAY)
+			ret:AddDelay(1)
+			local path = extract_table(Board:GetPath(p1, p2, PATH_FLYER))
+			local dist = #path - 1
+			for i = 1, #path do
+				local p = path[i]
+				ret:AddBounce(p, -2)
+				ret:AddDelay(.32 / dist)
+			end
+		else
+			ret:AddMove(Board:GetPath(p1, p2, mover:GetPathProf()), FULL_DELAY)
+		end
+
+
+		return ret
+	end
+
+	return oldMove(self, p1, p2, ...)
+end
 
 Meta_TechnoTumblebug = Pawn:new{
 	Name = "Techno-Tumblebug",
@@ -144,7 +197,7 @@ Meta_TechnoTumblebug = Pawn:new{
 	SkillList = {"Meta_TechnoTumblebugWeapon"},
 
 	-- movement sounds.
-	SoundLocation = "/enemy/dung_1/",
+	SoundLocation = "/enemy/dung_2/",
 
 	-- who will be controlling this unit.
 	DefaultTeam = TEAM_PLAYER,
@@ -158,7 +211,7 @@ Meta_TechnoMoth = Pawn:new{
 	Name = "Techno-Moth",
 	Class = "TechnoVek",
 	Health = 2,
-	MoveSpeed = 3,
+	MoveSpeed = 4,
 	Massive = true,
 	Corpse = true,
     Flying=true,

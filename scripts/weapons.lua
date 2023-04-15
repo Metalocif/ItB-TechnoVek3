@@ -1,3 +1,7 @@
+-- To do:
+-- o fix Moth preview images
+-- o Digger shouldn't burrow if on water
+
 --------
 --Moth--
 --------
@@ -27,7 +31,8 @@ Meta_TechnoMothWeapon = LineArtillery:new{
 		Enemy2 = Point(2,4),
 		--Enemy3 = Point(2,1),
 		Target = Point(2,1),
-		Mountain = Point(2,2)
+		Mountain = Point(2,2),
+		CustomPawn = "Meta_TechnoMoth"
 	}
 }
 
@@ -38,7 +43,7 @@ function Meta_TechnoMothWeapon:GetTargetArea(point)
 	if self.TwoClick then
 		ret:push_back(point)
 		for dir = DIR_START, DIR_END do
-			for k = 2, Board:GetPawn(point):GetMoveSpeed() do
+			for k = 3, Board:GetPawn(point):GetMoveSpeed() do
 				local curr = point + DIR_VECTORS[dir] * k
 				if not Board:IsBlocked(curr,PATH_PROJECTILE) then ret:push_back(curr) end
 			end
@@ -117,17 +122,35 @@ end
 
 Meta_TechnoMothWeapon_A = Meta_TechnoMothWeapon:new{
 	TwoClick = true,
-	UpgradeDescription = "Before firing, can also reposition to another tile, pushing things from both starting and landing tile."
+	UpgradeDescription = "Before firing, can also reposition to another tile, pushing things from both starting and landing tile.",
+	TipImage = {
+		Unit = Point(1,3),
+		Target = Point(3,3),
+		Mountain = Point(3,2),
+		Enemy = Point(3,0),
+		Second_Click = Point(3,0),
+		-- Second_Target = Point(3,0),
+		CustomPawn = "Meta_TechnoMoth",
+	}
 }
 
 Meta_TechnoMothWeapon_B = Meta_TechnoMothWeapon:new{
 	Damage = 3,
-	UpgradeDescription = "Increases damage by 2."
+	UpgradeDescription = "Increases damage by 2.",
 }
 			
 Meta_TechnoMothWeapon_AB = Meta_TechnoMothWeapon:new{
 	Damage = 3,
 	TwoClick = true,
+	TipImage = {
+		Unit = Point(1,3),
+		Target = Point(3,3),
+		Mountain = Point(3,2),
+		Enemy = Point(3,0),
+		Second_Click = Point(3,0),
+		-- Second_Target = Point(3,0),
+		CustomPawn = "Meta_TechnoMoth",
+	}
 }
 
 ----------
@@ -136,7 +159,7 @@ Meta_TechnoMothWeapon_AB = Meta_TechnoMothWeapon:new{
 
 Meta_TechnoDiggerWeapon = Skill:new{
 	Name = "Digging Tusks",
-	Description = "Dig up rocks on every adjacent empty tiles. Strike other tiles for 1 damage. Buildings are safe.",
+	Description = "Dig up rocks on all adjacent empty tiles. Strike nonempty tiles for 1 damage. Buildings are safe.",
 	Class = "TechnoVek",
 	Icon = "weapons/enemy_rocker1.png",
 	Rarity = 3,
@@ -148,21 +171,23 @@ Meta_TechnoDiggerWeapon = Skill:new{
 	UpgradeList = { "Hard Rocks", "Shrapnel"  },
 	ToSpawn = "Wall",
 	Shrapnel = false,
-	LaunchSound = "/weapons/fireball",
-	ImpactSound = "/props/fire_damage",
 	TipImage = {
-		Unit = Point(2,3),
+		Unit = Point(2,2),
 		Enemy = Point(2,1),
-		--Fire = Point(2,2),
-		Enemy2 = Point(2,4),
-		--Enemy3 = Point(2,1),
+		Enemy2 = Point(2,3),
+		Enemy3 = Point(1,1),
+		Enemy4 = Point(1,0),
 		Target = Point(2,1),
-		Mountain = Point(2,2)
+		Water = Point(3,2),
+		Building = Point(1,2),
+		CustomEnemy = "Wall",
+		CustomPawn = "Meta_TechnoDigger"
 	}
 }
 
 function Meta_TechnoDiggerWeapon:GetTargetArea(point)
 	local ret = PointList()
+	ret:push_back(point)
 	for i = DIR_START, DIR_END do
 		ret:push_back(DIR_VECTORS[i] + point)
 	end
@@ -170,7 +195,6 @@ function Meta_TechnoDiggerWeapon:GetTargetArea(point)
 end
 
 function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
-	--shrapnel should check ImpactMaterial == IMPACT_ROCK
 	local ret = SkillEffect()
 	
 	for dir = DIR_START, DIR_END do
@@ -195,7 +219,8 @@ function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
 	--check for rocks and do shrapnel
 	for dir = DIR_START, DIR_END do
 		local curr = p1 + DIR_VECTORS[dir]
-		if Board:GetPawn(curr) and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK then	--safest way to check it's a rock
+		if Board:GetPawn(curr) and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK and (curr == p2 or p1 == p2) then
+		--we only fire shrapnel if the rock is targeted or the Digger is targeted
 			for dir2 = DIR_START, DIR_END do
 				if curr + DIR_VECTORS[dir2] ~= p1 then ret:AddDamage(SpaceDamage(curr + DIR_VECTORS[dir2], 2)) end
 				--needs an animation but that will do for now
@@ -207,12 +232,12 @@ end
 
 Meta_TechnoDiggerWeapon_A = Meta_TechnoDiggerWeapon:new{
 	ToSpawn = "Wall2",
-	UpgradeDescription = "Digs harder rocks."
+	UpgradeDescription = "Digs harder rocks. They  have one more HP and deal 2 more damage when tossed by the Tumblebug."
 }
 
 Meta_TechnoDiggerWeapon_B = Meta_TechnoDiggerWeapon:new{
 	Shrapnel = true,
-	UpgradeDescription = "Hitting rocks damages them and adjacent things."
+	UpgradeDescription = "Hitting rocks damages them and adjacent things. Can either affect a single rock or all adjacent rocks."
 }
 			
 Meta_TechnoDiggerWeapon_AB = Meta_TechnoDiggerWeapon:new{
@@ -263,12 +288,11 @@ Meta_TechnoTumblebugWeapon = Skill:new{
 	ImpactSound = "/props/fire_damage",
 	TipImage = {
 		Unit = Point(2,3),
-		Enemy = Point(2,1),
-		--Fire = Point(2,2),
-		Enemy2 = Point(2,4),
-		--Enemy3 = Point(2,1),
-		Target = Point(2,1),
-		Mountain = Point(2,2)
+		Enemy = Point(2,2),
+		Target = Point(3,3),
+		Second_Click = Point(2,0),
+		Mountain = Point(2,1),
+		CustomPawn = "Meta_TechnoTumblebug",
 	}
 }
 
@@ -277,8 +301,8 @@ function Meta_TechnoTumblebugWeapon:GetTargetArea(point)
 	for i = DIR_START, DIR_END do
 		local curr = point + DIR_VECTORS[i]
 		if not Board:IsBlocked(curr, PATH_GROUND) then ret:push_back(curr) end	
-		if not Board:IsBlocked(curr, PATH_GROUND) or Board:GetPawn(curr) then
-			for k = 3, 7 do
+		if not Board:IsBlocked(curr, PATH_GROUND) or (Board:GetPawn(curr) and not Board:GetPawn(curr):IsGuarding()) then
+			for k = 2, 7 do
 				local curr2 = point + DIR_VECTORS[i] * k
 				if not Board:IsValid(curr2) then break end
 				if Board:GetPawn(curr) or not Board:IsBlocked(curr, PATH_GROUND) then
@@ -287,7 +311,7 @@ function Meta_TechnoTumblebugWeapon:GetTargetArea(point)
 						--we can toss rocks on things as well, damaging them
 						--second condition is because we'd spawn a rock on a ground tile, then toss it
 					else
-						if not Board:IsBlocked(curr2, PATH_GROUND) then ret:push_back(curr2) end
+						if not Board:IsBlocked(curr2, PATH_PROJECTILE) then ret:push_back(curr2) end
 						--we can toss pawns on empty tiles only
 					end
 				end
@@ -305,10 +329,10 @@ function Meta_TechnoTumblebugWeapon:GetSecondTargetArea(p1, p2)
 	for i = DIR_START, DIR_END do
 		local curr = p1 + DIR_VECTORS[i]
 		if not Board:IsBlocked(curr, PATH_GROUND) then ret:push_back(curr) end
-		if Board:GetPawn(curr) then --and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK then
-			for j = 3, 7 do
+		if Board:GetPawn(curr) and not Board:GetPawn(curr):IsGuarding() then --and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK then
+			for j = 2, 7 do
 				local curr2 = p1 + DIR_VECTORS[i] * j
-				ret:push_back(curr2)
+				if _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK or not Board:IsBlocked(curr2, PATH_PROJECTILE) then ret:push_back(curr2) end
 			end
 		end
 	end
@@ -324,10 +348,10 @@ function Meta_TechnoTumblebugWeapon:IsTwoClickException(p1,p2)
 	return false
 end
 
-function Meta_TechnoTumblebugWeapon:GetSkillEffect(p1,p2)
-	local ret = SkillEffect()
+function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 	local direction = GetDirection(p2-p1)
-	if p1:Manhattan(p2) == 1 and not Board:GetPawn(p2) then	--just spawning a rock
+	if p1:Manhattan(p2) == 1 and not Board:GetPawn(p2) then	
+	--just spawning a rock
 		local damage = SpaceDamage(p2, 0)
 		damage.sPawn = self.ToSpawn
 		ret:AddMelee(p1,damage)
@@ -341,40 +365,70 @@ function Meta_TechnoTumblebugWeapon:GetSkillEffect(p1,p2)
 		move:push_back(p2)
 		ret:AddLeap(move, FULL_DELAY)
 		ret:AddDamage(SpaceDamage(p2, 1))
-	else
-	--yeeting a rock - either already there or not - can either yeet at a thing or empty space, can yeet different rocks
+	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) then
+	--yeeting an existing rock
 		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
-		if not Board:GetPawn(p1 + DIR_VECTORS[direction]) then 
-			fake_punch.sPawn = self.ToSpawn 
-			ret:AddMelee(p1,fake_punch)
-			ret:AddDelay(0.5)	--only delay if spawning it
-		else
-			ret:AddMelee(p1,fake_punch)
-		end
+		ret:AddMelee(p1,fake_punch)
 		if not Board:IsBlocked(p2, PATH_PROJECTILE) then
-		--just make the rock leap to p2, then damage it
 			local move = PointList()
 			move:push_back(p1+DIR_VECTORS[direction])
 			move:push_back(p2)
 			ret:AddLeap(move, FULL_DELAY)
 			ret:AddDamage(SpaceDamage(p2, 1))
 		else
-		--we are basically using the Rock Thrower weapon
 			local rockID = Board:GetPawn(p1 + DIR_VECTORS[direction]):GetId()
-			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", rockID))
-			--delete the rock because it """becomes""" a projectile
-			local damage = SpaceDamage(p2, 2)
-			if Board:GetPawn(rockID) then damage.iAmount = Board:GetPawn(rockID):GetMaxHealth() * 2 else damage.iAmount = 2 end
-			if Board:GetPawn(rockID) and _G[Board:GetPawn(rockID):GetType()].Explodes then 
-				damage.iAmount = damage.iAmount + 1 
-				-- damage.sAnimation = "rock2d" 
-				ret:AddArtillery(p1,damage,"effects/upshot_bombrock.png")
-				ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(%s)", rockID, p2:GetString()))
-				--adddeatheffect
-				ret:AddScript(string.format("Board:GetPawn(%s):Kill(false)", rockID))
+			local damage = SpaceDamage(p2, Board:GetPawn(rockID):GetMaxHealth() * 2)
+			if Board:GetPawn(rockID):IsFire() then damage.iFire = EFFECT_CREATE end
+			if Board:GetPawn(rockID):IsAcid() then damage.iAcid = EFFECT_CREATE end
+			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", Point(p1 + DIR_VECTORS[direction]):GetString()))
+			if _G[Board:GetPawn(rockID):GetType()].Explodes then
+				damage.iDamage = damage.iDamage + 1 
+				damage.sAnimation = "rock2d" 
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png")
+				ret:AddDelay(0.1)
+				for dir = DIR_START, DIR_END do
+					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
+					exploDamage.sAnimation = "exploout2_"..dir --(dir+2)%4
+					ret:AddDamage(exploDamage)
+				end
 			else
 				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1,damage,"effects/shotdown_rock.png")
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/shotdown_rock.png")
+			end
+		end
+		ret:AddBounce(p2,3)
+		ret:AddDamage(SpaceDamage(p2 + DIR_VECTORS[(direction + 1)%4], 0, (direction + 1)%4))
+		ret:AddDamage(SpaceDamage(p2 + DIR_VECTORS[(direction + 3)%4], 0, (direction + 3)%4))
+	else
+	--spawning and yeeting a rock
+		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
+		fake_punch.sPawn = self.ToSpawn 
+		ret:AddMelee(p1,fake_punch)
+		ret:AddDelay(0.5)
+		if not Board:IsBlocked(p2, PATH_PROJECTILE) then
+			local move = PointList()
+			move:push_back(p1+DIR_VECTORS[direction])
+			move:push_back(p2)
+			ret:AddLeap(move, FULL_DELAY)
+			ret:AddDamage(SpaceDamage(p2, 1))
+		else
+			local damage = SpaceDamage(p2, 2)
+			if Board:IsFire(p1 + DIR_VECTORS[direction]) then damage.iFire = EFFECT_CREATE end
+			if Board:IsAcid(p1 + DIR_VECTORS[direction]) then damage.iAcid = EFFECT_CREATE end
+			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", Point(p1 + DIR_VECTORS[direction]):GetString()))
+			if self.ToSpawn == "BombRock" then
+				damage.iDamage = damage.iDamage + 1 
+				damage.sAnimation = "rock2d" 
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png")
+				ret:AddDelay(0.1)
+				for dir = DIR_START, DIR_END do
+					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
+					exploDamage.sAnimation = "exploout2_"..dir --(dir+2)%4
+					ret:AddDamage(exploDamage)
+				end
+			else
+				damage.sAnimation = "rock1d" 
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/shotdown_rock.png")
 			end
 		end
 		ret:AddBounce(p2,3)
@@ -384,121 +438,18 @@ function Meta_TechnoTumblebugWeapon:GetSkillEffect(p1,p2)
 	return ret
 end
 
+
+
+function Meta_TechnoTumblebugWeapon:GetSkillEffect(p1,p2)
+	local ret = SkillEffect()
+	self:TossStuff(ret, p1, p2)
+	return ret
+end
+
 function Meta_TechnoTumblebugWeapon:GetFinalEffect(p1,p2,p3)
 	local ret = SkillEffect()
-
-	local direction = GetDirection(p2-p1)
-	if p1:Manhattan(p2) == 1 and not Board:GetPawn(p2) then	--just spawning a rock
-		local damage = SpaceDamage(p2, 0)
-		damage.sPawn = self.ToSpawn
-		ret:AddMelee(p1,damage)
-		ret:AddDelay(0.5)
-	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) and not _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial == IMPACT_ROCK then
-	--yeeting a non-rock pawn
-		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
-		ret:AddMelee(p1,fake_punch)
-		local move = PointList()
-		move:push_back(p1+DIR_VECTORS[direction])
-		move:push_back(p2)
-		ret:AddLeap(move, FULL_DELAY)
-		ret:AddDamage(SpaceDamage(p2, 1))
-	else
-	--yeeting a rock - either already there or not - can either yeet at a thing or empty space, can yeet different rocks
-		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
-		if not Board:GetPawn(p1 + DIR_VECTORS[direction]) then 
-			fake_punch.sPawn = self.ToSpawn 
-			ret:AddMelee(p1,fake_punch)
-			ret:AddDelay(0.5)	--only delay if spawning it
-		else
-			ret:AddMelee(p1,fake_punch)
-		end
-		if not Board:IsBlocked(p2, PATH_PROJECTILE) then
-		--just make the rock leap to p2, then damage it
-			local move = PointList()
-			move:push_back(p1+DIR_VECTORS[direction])
-			move:push_back(p2)
-			ret:AddLeap(move, FULL_DELAY)
-			ret:AddDamage(SpaceDamage(p2, 1))
-		else
-		--we are basically using the Rock Thrower weapon
-			local rockID = Board:GetPawn(p1 + DIR_VECTORS[direction]):GetId()
-			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", rockID))
-			--delete the rock because it """becomes""" a projectile
-			local damage = SpaceDamage(p2, 2)
-			if Board:GetPawn(rockID) then damage.iAmount = Board:GetPawn(rockID):GetMaxHealth() * 2 else damage.iAmount = 2 end
-			if Board:GetPawn(rockID) and _G[Board:GetPawn(rockID):GetType()].Explodes then 
-				damage.iAmount = damage.iAmount + 1 
-				-- damage.sAnimation = "rock2d" 
-				ret:AddArtillery(p1,damage,"effects/upshot_bombrock.png")
-				ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(%s)", rockID, p2:GetString()))
-				--adddeatheffect
-				ret:AddScript(string.format("Board:GetPawn(%s):Kill(false)", rockID))
-			else
-				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1,damage,"effects/shotdown_rock.png")
-			end
-		end
-		ret:AddBounce(p2,3)
-		ret:AddDamage(SpaceDamage(p2 + DIR_VECTORS[(direction + 1)%4], 0, (direction + 1)%4))
-		ret:AddDamage(SpaceDamage(p2 + DIR_VECTORS[(direction + 3)%4], 0, (direction + 3)%4))
-	end
-
-	local direction = GetDirection(p3-p1)
-	if p1:Manhattan(p3) == 1 and not Board:GetPawn(p3) then	--just spawning a rock
-		local damage = SpaceDamage(p3, 0)
-		damage.sPawn = self.ToSpawn
-		ret:AddMelee(p1,damage)
-		ret:AddDelay(0.5)
-	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) and not _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial == IMPACT_ROCK then
-	--yeeting a non-rock pawn
-		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
-		ret:AddMelee(p1,fake_punch)
-		local move = PointList()
-		move:push_back(p1+DIR_VECTORS[direction])
-		move:push_back(p3)
-		ret:AddLeap(move, FULL_DELAY)
-		ret:AddDamage(SpaceDamage(p3, 1))
-	else
-	--yeeting a rock - either already there or not - can either yeet at a thing or empty space, can yeet different rocks
-		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
-		if not Board:GetPawn(p1 + DIR_VECTORS[direction]) then 
-			fake_punch.sPawn = self.ToSpawn 
-			ret:AddMelee(p1,fake_punch)
-			ret:AddDelay(0.5)	--only delay if spawning it
-		else
-			ret:AddMelee(p1,fake_punch)
-		end
-		if not Board:IsBlocked(p3, PATH_PROJECTILE) then
-		--just make the rock leap to p3, then damage it
-			local move = PointList()
-			move:push_back(p1+DIR_VECTORS[direction])
-			move:push_back(p3)
-			ret:AddLeap(move, FULL_DELAY)
-			ret:AddDamage(SpaceDamage(p3, 1))
-		else
-		--we are basically using the Rock Thrower weapon
-			local rockID = Board:GetPawn(p1 + DIR_VECTORS[direction]):GetId()
-			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", rockID))
-			--delete the rock because it """becomes""" a projectile
-			local damage = SpaceDamage(p3, 2)
-			if Board:GetPawn(rockID) then damage.iAmount = Board:GetPawn(rockID):GetMaxHealth() * 2 else damage.iAmount = 2 end
-			if Board:GetPawn(rockID) and _G[Board:GetPawn(rockID):GetType()].Explodes then 
-				damage.iAmount = damage.iAmount + 1 
-				-- damage.sAnimation = "rock2d" 
-				ret:AddArtillery(p1,damage,"effects/upshot_bombrock.png")
-				ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(%s)", rockID, p3:GetString()))
-				--adddeatheffect
-				ret:AddScript(string.format("Board:GetPawn(%s):Kill(false)", rockID))
-			else
-				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1,damage,"effects/shotdown_rock.png")
-			end
-		end
-		ret:AddBounce(p3,3)
-		ret:AddDamage(SpaceDamage(p3 + DIR_VECTORS[(direction + 1)%4], 0, (direction + 1)%4))
-		ret:AddDamage(SpaceDamage(p3 + DIR_VECTORS[(direction + 3)%4], 0, (direction + 3)%4))
-	end
-	
+	self:TossStuff(ret, p1, p2)
+	self:TossStuff(ret, p1, p3)
 	return ret
 end
 
