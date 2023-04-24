@@ -1,13 +1,13 @@
--- To do:
--- o fix Moth preview images
--- o Moth's projectile is blue but weapon icon is green, pick one
-
 --------
 --Moth--
 --------
 local resourcePath = mod_loader.mods[modApi.currentMod].resourcePath
 modApi:appendAsset("img/weapons/ranged_mothweapon.png", resourcePath.."img/weapons/ranged_mothweapon.png")
 modApi:appendAsset("img/effects/upshot_bombrock.png", resourcePath.."img/effects/upshot_bombrock.png")
+for i = 1, 5 do
+	modApi:appendAsset("img/effects/shrapnel"..i.."_U.png", resourcePath.."img/effects/shrapnel"..i.."_U.png")
+	modApi:appendAsset("img/effects/shrapnel"..i.."_R.png", resourcePath.."img/effects/shrapnel"..i.."_R.png")
+end
 
 Meta_TechnoMothWeapon = LineArtillery:new{
 	Name = "Repulsive Pellets",
@@ -192,6 +192,7 @@ Meta_TechnoDiggerWeapon = Skill:new{
 		Target = Point(2,1),
 		Water = Point(3,2),
 		Building = Point(1,2),
+		Building2 = Point(3,1),
 		CustomEnemy = "Wall",
 		CustomPawn = "Meta_TechnoDigger"
 	}
@@ -220,22 +221,22 @@ function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
 		elseif Board:GetTerrain(curr) ~= TERRAIN_BUILDING then 
 			damage.iDamage = self.Damage
 			damage.sAnimation = "explorocker_"..dir
-			-- damage.sSound = "/enemy/"..self.SoundId.."/attack"
+			damage.sSound = "/enemy/digger_2/attack"
 			ret:AddDamage(damage)
 		end
-		
-		
 	end	
+	
 	if not self.Shrapnel then return ret end
-	-- ret:AddDelay(0.25)
 	--check for rocks and do shrapnel
+	ret:AddDelay(0.35)
 	for dir = DIR_START, DIR_END do
 		local curr = p1 + DIR_VECTORS[dir]
 		if Board:GetPawn(curr) and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK and (curr == p2 or p1 == p2) then
 		--we only fire shrapnel if the rock is targeted or the Digger is targeted
 			for dir2 = DIR_START, DIR_END do
-				if curr + DIR_VECTORS[dir2] ~= p1 then ret:AddDamage(SpaceDamage(curr + DIR_VECTORS[dir2], 2)) end
-				--needs an animation but that will do for now
+				if curr + DIR_VECTORS[dir2] ~= p1 and not Board:IsBuilding(curr + DIR_VECTORS[dir2]) then ret:AddProjectile(curr, SpaceDamage(curr + DIR_VECTORS[dir2], 2), "effects/shrapnel"..math.random(1, 5), NO_DELAY) end
+				--we fire from rocks towards tiles that are neither the Digger nor Buildings
+				--random projectiles graphics because so many are fired at once
 			end
 		end
 	end
@@ -254,6 +255,7 @@ Meta_TechnoDiggerWeapon_A = Meta_TechnoDiggerWeapon:new{
 		Target = Point(2,1),
 		Water = Point(3,2),
 		Building = Point(1,2),
+		Building2 = Point(3,1),
 		CustomEnemy = "Wall2",
 		CustomPawn = "Meta_TechnoDigger",
 	}
@@ -276,6 +278,7 @@ Meta_TechnoDiggerWeapon_AB = Meta_TechnoDiggerWeapon:new{
 		Target = Point(2,1),
 		Water = Point(3,2),
 		Building = Point(1,2),
+		Building2 = Point(3,1),
 		CustomEnemy = "Wall2",
 		CustomPawn = "Meta_TechnoDigger",
 	}
@@ -378,6 +381,14 @@ end
 function Meta_TechnoTumblebugWeapon:IsTwoClickException(p1,p2)
 	-- if p1:Manhattan(p2) > 1 then return true end	--if first click is a toss, we can't do anything else
 	local direction = GetDirection(p2-p1)
+	local blockedTiles = 0
+	for dir = DIR_START, DIR_END do
+		local curr = p1 + DIR_VECTORS[dir]
+		if Board:GetTerrain(curr) == TERRAIN_WATER or Board:IsBuilding(curr) or Board:GetTerrain(curr) == TERRAIN_MOUNTAIN then blockedTiles = blockedTiles + 1 end
+		if Board:GetPawn(curr) and Board:GetPawn(curr):IsGuarding() then blockedTiles = blockedTiles + 1 end
+	end
+	--quick and dirty, I may be missing a possibility
+	if blockedTiles >= 3 then return true end
 	if self.FreeThrow and Board:GetPawn(p1 + DIR_VECTORS[direction]) and _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial == IMPACT_ROCK then return false end
 	-- if not Board:IsBlocked(p2, PATH_PROJECTILE) then return false end	--we only do two click weapon stuff if there is a pawn in p2
 	if p1:Manhattan(p2) > 1 then return true end
