@@ -1,6 +1,6 @@
 -- To do:
 -- o fix Moth preview images
--- o Digger shouldn't burrow if on water
+-- o Moth's projectile is blue but weapon icon is green, pick one
 
 --------
 --Moth--
@@ -11,11 +11,11 @@ modApi:appendAsset("img/effects/upshot_bombrock.png", resourcePath.."img/effects
 
 Meta_TechnoMothWeapon = LineArtillery:new{
 	Name = "Repulsive Pellets",
-	Description = "Launch an artillery attack. The Moth's wings also push everything adjacent to it.",
+	Description = "Launch a pushing artillery attack. The Moth's wings also push everything adjacent to it.",
 	Class = "TechnoVek",
 	Icon = "weapons/ranged_mothweapon.png",
 	Rarity = 3,
-	UpShot = "effects/shotup_crab1.png",
+	UpShot = "effects/shotup_crab2.png",
 	BuildingDamage = true,
 	PowerCost = 0, --AE Change
 	Damage = 1,
@@ -74,25 +74,37 @@ end
 
 function Meta_TechnoMothWeapon:GetSkillEffect(p1,p2)
 	local ret = SkillEffect()
-	
+	local direction = GetDirection(p2-p1)
 	ret:AddBounce(p1, 1)
-
-	local damage = SpaceDamage(p2,self.Damage)
-	damage.sAnimation = "ExploArt2"
-	ret:AddArtillery(damage, self.UpShot)
-	
-	for dir = DIR_START, DIR_END do
-		damage = SpaceDamage(p1 + DIR_VECTORS[dir], 0, dir)
-		damage.sAnimation = "airpush_"..dir
-		ret:AddDamage(damage)
+	if self.TwoClick then
+		for dir = DIR_START, DIR_END do
+			damage = SpaceDamage(p1 + DIR_VECTORS[dir], 0, dir)
+			damage.sAnimation = "airpush_"..dir
+			ret:AddDamage(damage)
+		end
+		local move = PointList()
+		move:push_back(p1)
+		move:push_back(p2)
+		ret:AddBounce(p1, 1)
+		ret:AddLeap(move,FULL_DELAY)
+	else
+		local damage = SpaceDamage(p2, self.Damage, direction)
+		damage.sAnimation = "ExploArt2"
+		ret:AddArtillery(damage, self.UpShot)
+		
+		for dir = DIR_START, DIR_END do
+			damage = SpaceDamage(p1 + DIR_VECTORS[dir], 0, dir)
+			damage.sAnimation = "airpush_"..dir
+			ret:AddDamage(damage)
+		end
+		ret:AddBounce(p2, 2)
 	end
-	ret:AddBounce(p2, 2)
-	
 	return ret
 end
 
 function Meta_TechnoMothWeapon:GetFinalEffect(p1,p2,p3)
 	local ret = SkillEffect()
+	local direction = GetDirection(p3-p2)
 	if p1 ~= p2 then
 		for dir = DIR_START, DIR_END do
 			damage = SpaceDamage(p1 + DIR_VECTORS[dir], 0, dir)
@@ -110,7 +122,7 @@ function Meta_TechnoMothWeapon:GetFinalEffect(p1,p2,p3)
 		damage.sAnimation = "airpush_"..dir
 		ret:AddDamage(damage)
 	end
-	local damage = SpaceDamage(p3,self.Damage)
+	local damage = SpaceDamage(p3, self.Damage, direction)
 	damage.sAnimation = "ExploArt2"
 	ret:AddArtillery(p2, damage, self.UpShot)
 	
@@ -124,7 +136,7 @@ Meta_TechnoMothWeapon_A = Meta_TechnoMothWeapon:new{
 	TwoClick = true,
 	UpgradeDescription = "Before firing, can also reposition to another tile, pushing things from both starting and landing tile.",
 	TipImage = {
-		Unit = Point(1,3),
+		Unit = Point(0,3),
 		Target = Point(3,3),
 		Mountain = Point(3,2),
 		Enemy = Point(3,0),
@@ -232,17 +244,41 @@ end
 
 Meta_TechnoDiggerWeapon_A = Meta_TechnoDiggerWeapon:new{
 	ToSpawn = "Wall2",
-	UpgradeDescription = "Digs harder rocks. They  have one more HP and deal 2 more damage when tossed by the Tumblebug."
+	UpgradeDescription = "Digs harder rocks. They  have one more HP and deal 2 more damage when tossed by the Tumblebug.",
+	TipImage = {
+		Unit = Point(2,2),
+		Enemy = Point(2,1),
+		Enemy2 = Point(2,3),
+		Enemy3 = Point(1,1),
+		Enemy4 = Point(1,0),
+		Target = Point(2,1),
+		Water = Point(3,2),
+		Building = Point(1,2),
+		CustomEnemy = "Wall2",
+		CustomPawn = "Meta_TechnoDigger",
+	}
 }
 
 Meta_TechnoDiggerWeapon_B = Meta_TechnoDiggerWeapon:new{
 	Shrapnel = true,
-	UpgradeDescription = "Hitting rocks damages them and adjacent things. Can either affect a single rock or all adjacent rocks."
+	UpgradeDescription = "Hitting rocks damages them and adjacent things. Can either affect a single rock or all adjacent rocks.",
 }
 			
 Meta_TechnoDiggerWeapon_AB = Meta_TechnoDiggerWeapon:new{
 	ToSpawn = "Wall2",
 	Shrapnel = true,
+	TipImage = {
+		Unit = Point(2,2),
+		Enemy = Point(2,1),
+		Enemy2 = Point(2,3),
+		Enemy3 = Point(1,1),
+		Enemy4 = Point(1,0),
+		Target = Point(2,1),
+		Water = Point(3,2),
+		Building = Point(1,2),
+		CustomEnemy = "Wall2",
+		CustomPawn = "Meta_TechnoDigger",
+	}
 }
 
 Wall2 = 
@@ -284,8 +320,8 @@ Meta_TechnoTumblebugWeapon = Skill:new{
 	UpgradeCost = {1,2},
 	UpgradeList = { "Explosive Rocks", "Free Throw"  },
 	ToSpawn = "Wall",
-	LaunchSound = "/weapons/fireball",
-	ImpactSound = "/props/fire_damage",
+	LaunchSound = "/weapons/boulder_throw",
+	ImpactSound = "/impact/dynamic/rock",
 	TipImage = {
 		Unit = Point(2,3),
 		Enemy = Point(2,2),

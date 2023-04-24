@@ -39,6 +39,7 @@ local files = {
 	"Meta_TechnoTumblebug_broken.png",
 	"Meta_TechnoTumblebug_ns.png",
 	"Meta_TechnoTumblebug_h.png",
+	"Meta_TechnoTumblebug_emerge.png",
 }
 for _, file in ipairs(files) do
 	modApi:appendAsset("img/units/player/".. file, mechPath .. file)
@@ -50,6 +51,7 @@ local a=ANIMS
 	a.Meta_TechnoTumblebug_broken = a.MechUnit:new{Image="units/player/Meta_TechnoTumblebug_broken.png", PosX = -21, PosY = -3 }
 	a.Meta_TechnoTumblebugw_broken = a.MechUnit:new{Image="units/player/Meta_TechnoTumblebug_w_broken.png", PosX = -19, PosY = 6 }
 	a.Meta_TechnoTumblebug_ns = a.MechIcon:new{Image="units/player/Meta_TechnoTumblebug_ns.png"}
+	a.Meta_TechnoTumblebuge = a.MechIcon:new{Image="units/player/Meta_TechnoTumblebug_emerge.png", PosX = -21, PosY = -3, Loop = false, NumFrames = 10, Time = .07}
 
 local files = {
 	"Meta_TechnoMoth.png",
@@ -130,7 +132,7 @@ AddPawn("Meta_TechnoDigger")
 local oldMove = Move.GetTargetArea
 function Move:GetTargetArea(p, ...)
 	local mover = Board:GetPawn(p)
-	if mover and mover:GetType() == "Meta_TechnoDigger" then
+	if mover and (mover:GetType() == "Meta_TechnoDigger" or mover:GetType() == "Meta_TechnoTumblebug") then
 		local old = extract_table(Board:GetReachable(p, mover:GetMoveSpeed(), PATH_FLYER))
 		local ret = PointList()
 
@@ -151,7 +153,7 @@ end
 local oldMove = Move.GetSkillEffect
 function Move:GetSkillEffect(p1, p2, ...)
 	local mover = Board:GetPawn(p1)
-	if mover and mover:GetType() == "Meta_TechnoDigger" then
+	if mover and (mover:GetType() == "Meta_TechnoDigger" or mover:GetType() == "Meta_TechnoTumblebug") then
 		local ret = SkillEffect()
 		local pawnId = mover:GetId()
 
