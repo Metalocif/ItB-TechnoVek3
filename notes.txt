@@ -6,6 +6,7 @@ This should cover modded rocks as well.
 Rocks die if they are on fire, so be quick.
 - The Digger's shrapnel can be targeted at a single rock or all rocks.
 - The Digger's shrapnel can hit the same thing twice for 4 damage.
+- The Digger's Encased Buildings are regular pawns; they can be set on fire and used for shrapnel.
 - You want as many rocks on the battlefield as possible; therefore, when you toss a pawn, spawn a rock as well.
 - The Moth's reposition range increases with its movespeed.
 - The Moth can push things twice in one attack with its reposition upgrade.
