@@ -1,13 +1,27 @@
+-- Known issues:
+-- o Art for the encased buildings is shit.
+-- o They shouldn't always be that big, we want a way to find when a building is that big.
+-- o The TipImage for the Digger's encasing upgrade doesn't encase anything.
+
 --------
 --Moth--
 --------
 local resourcePath = mod_loader.mods[modApi.currentMod].resourcePath
 modApi:appendAsset("img/weapons/ranged_mothweapon.png", resourcePath.."img/weapons/ranged_mothweapon.png")
 modApi:appendAsset("img/effects/upshot_bombrock.png", resourcePath.."img/effects/upshot_bombrock.png")
+modApi:appendAsset("img/units/player/encasedbuilding.png", resourcePath.."img/units/player/encasedbuilding.png")
+modApi:appendAsset("img/units/player/encasedbuilding_d.png", resourcePath.."img/units/player/encasedbuilding_d.png")
+modApi:appendAsset("img/units/player/encasedbuilding_e.png", resourcePath.."img/units/player/encasedbuilding_e.png")
+
 for i = 1, 5 do
 	modApi:appendAsset("img/effects/shrapnel"..i.."_U.png", resourcePath.."img/effects/shrapnel"..i.."_U.png")
 	modApi:appendAsset("img/effects/shrapnel"..i.."_R.png", resourcePath.."img/effects/shrapnel"..i.."_R.png")
 end
+ANIMS.encasedbuilding = 	ANIMS.BaseUnit:new{ Image = "units/player/encasedbuilding.png", PosX = -18, PosY = -44, Loop = false, Time = 0.3, Height = 1}
+ANIMS.encasedbuildinga = 	ANIMS.encasedbuilding:new{ Image = "units/player/encasedbuilding.png", PosX = -18, PosY = -44, Loop = true, Time = 0.3}
+ANIMS.encasedbuildingd = 	ANIMS.encasedbuilding:new{ Image = "units/player/encasedbuilding_d.png", PosX = -34, PosY = -44, NumFrames = 13, Time = 0.09, Loop = false }
+ANIMS.encasedbuildinge = 	ANIMS.encasedbuilding:new{ Image = "units/player/encasedbuilding_e.png", PosX = -18, PosY = -44, NumFrames = 5, Time = 0.07, Loop = false }
+
 
 Meta_TechnoMothWeapon = LineArtillery:new{
 	Name = "Repulsive Pellets",
@@ -43,6 +57,7 @@ function Meta_TechnoMothWeapon:GetTargetArea(point)
 	if self.TwoClick then
 		ret:push_back(point)
 		for dir = DIR_START, DIR_END do
+			if not (Board:GetPawn(point + DIR_VECTORS[dir]) and not Board:GetPawn(point + DIR_VECTORS[dir]):IsGuarding()) and not Board:IsBlocked(point + DIR_VECTORS[dir] * 2, PATH_PROJECTILE) then ret:push_back(point + DIR_VECTORS[dir] * 2) end
 			for k = 3, Board:GetPawn(point):GetMoveSpeed() do
 				local curr = point + DIR_VECTORS[dir] * k
 				if not Board:IsBlocked(curr,PATH_PROJECTILE) then ret:push_back(curr) end
@@ -179,8 +194,8 @@ Meta_TechnoDiggerWeapon = Skill:new{
 	Damage = 1,
 	Range  = 1,
 	Upgrades = 2,
-	UpgradeCost = {1,2},
-	UpgradeList = { "Hard Rocks", "Shrapnel"  },
+	UpgradeCost = {2,2},
+	UpgradeList = { "Hard Rocks", "Encase Building"  },
 	ToSpawn = "Wall",
 	Shrapnel = false,
 	TipImage = {
@@ -214,15 +229,31 @@ function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
 		local curr = p1 + DIR_VECTORS[dir]
 		local damage = SpaceDamage(curr)
 		if not Board:IsBlocked(curr,PATH_PROJECTILE) and Board:GetTerrain(curr) ~= TERRAIN_WATER and not Board:IsPod(curr) then
-			
 			damage.sPawn = self.ToSpawn
-			-- damage.sSound = "/enemy/"..self.SoundId.."/attack_queued"
+			damage.sSound = "/enemy/digger_2/attack_queued"
 			ret:AddDamage(damage)
 		elseif Board:GetTerrain(curr) ~= TERRAIN_BUILDING then 
 			damage.iDamage = self.Damage
 			damage.sAnimation = "explorocker_"..dir
 			damage.sSound = "/enemy/digger_2/attack"
 			ret:AddDamage(damage)
+		elseif self.EncaseBuildings and curr == p2 then
+			local mission = GetCurrentMission()
+			if mission then
+				if not mission.EncasedBuildings then mission.EncasedBuildings = {} end
+				if Board:IsUniqueBuilding(curr) then 
+					mission.EncasedBuildings[curr:GetString()] = tostring(Board:GetUniqueBuilding(curr)) 
+					damage.sScript = string.format("Board:SetUniqueBuilding(%s, \"\")", curr:GetString())	--probably unneeded
+				else 
+					mission.EncasedBuildings[curr:GetString()] = Board:GetHealth(curr) .. Board:GetMaxHealth(curr) 
+					--we store both current and max HP so we can remake a half-destroyed building later
+				end
+				--mission.EncasedBuildings[curr:GetString()] = tostring(Board:GetUniqueBuilding(curr)) or Board:GetHealth(curr)
+				--for some reason the above doesn't work, I imagine because tostring(nil) ~= nil
+				damage.iTerrain = 0
+				damage.sPawn = "EncasedBuilding"
+				ret:AddDamage(damage)
+			end        
 		end
 	end	
 	
@@ -235,7 +266,7 @@ function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
 		--we only fire shrapnel if the rock is targeted or the Digger is targeted
 			for dir2 = DIR_START, DIR_END do
 				if curr + DIR_VECTORS[dir2] ~= p1 and not Board:IsBuilding(curr + DIR_VECTORS[dir2]) then ret:AddProjectile(curr, SpaceDamage(curr + DIR_VECTORS[dir2], 2), "effects/shrapnel"..math.random(1, 5), NO_DELAY) end
-				--we fire from rocks towards tiles that are neither the Digger nor Buildings
+				--we fire from rocks towards tiles that are neither the Digger nor buildings
 				--random projectiles graphics because so many are fired at once
 			end
 		end
@@ -245,7 +276,8 @@ end
 
 Meta_TechnoDiggerWeapon_A = Meta_TechnoDiggerWeapon:new{
 	ToSpawn = "Wall2",
-	UpgradeDescription = "Digs harder rocks. They  have one more HP and deal 2 more damage when tossed by the Tumblebug.",
+	Shrapnel = true,
+	UpgradeDescription = "Digs harder rocks. They have one more HP and deal 2 more damage when tossed by the Tumblebug. Hitting rocks now damages adjacent things.",
 	TipImage = {
 		Unit = Point(2,2),
 		Enemy = Point(2,1),
@@ -262,13 +294,27 @@ Meta_TechnoDiggerWeapon_A = Meta_TechnoDiggerWeapon:new{
 }
 
 Meta_TechnoDiggerWeapon_B = Meta_TechnoDiggerWeapon:new{
-	Shrapnel = true,
-	UpgradeDescription = "Hitting rocks damages them and adjacent things. Can either affect a single rock or all adjacent rocks.",
+	EncaseBuildings = true,
+	UpgradeDescription = "Can now encase buildings in stone to protect them.",
+	TipImage = {
+		Unit = Point(2,2),
+		Enemy = Point(2,1),
+		Enemy2 = Point(2,3),
+		Enemy3 = Point(1,1),
+		Enemy4 = Point(1,0),
+		Target = Point(1,2),
+		Water = Point(3,2),
+		Building = Point(1,2),
+		Building2 = Point(3,1),
+		CustomEnemy = "Wall",
+		CustomPawn = "Meta_TechnoDigger",
+	}
 }
 			
 Meta_TechnoDiggerWeapon_AB = Meta_TechnoDiggerWeapon:new{
 	ToSpawn = "Wall2",
 	Shrapnel = true,
+	EncaseBuildings = true,
 	TipImage = {
 		Unit = Point(2,2),
 		Enemy = Point(2,1),
@@ -276,6 +322,8 @@ Meta_TechnoDiggerWeapon_AB = Meta_TechnoDiggerWeapon:new{
 		Enemy3 = Point(1,1),
 		Enemy4 = Point(1,0),
 		Target = Point(2,1),
+		Second_Origin = Point(2,2),
+		Second_Target = Point(1,2),
 		Water = Point(3,2),
 		Building = Point(1,2),
 		Building2 = Point(3,1),
@@ -297,6 +345,43 @@ Wall2 =
 		ImpactMaterial = IMPACT_ROCK
 	}
 AddPawn("Wall2") 
+
+EncasedBuilding = 
+	{
+		Name = "Encased Building",
+		Health = 1,
+		Neutral = true,
+		MoveSpeed = 0,
+		IsPortrait = false,
+		LargeShield = true,
+		Pushable = false,				--both logical and necessary so we can find the encased building back on death
+		IsDeathEffect = true,			--finds the encased buildings back to respawn them
+		Image = "encasedbuilding",
+		SoundLocation = "/support/rock/",
+		DefaultTeam = TEAM_NONE,
+		ImpactMaterial = IMPACT_ROCK,	--can throw shrapnel
+	}
+AddPawn("EncasedBuilding") 
+
+function EncasedBuilding:GetDeathEffect(point)
+	local ret = SkillEffect()
+	local mission = GetCurrentMission()
+	--check string is number, if yes spawn normal building & set health
+	if not tonumber(mission.EncasedBuildings[point:GetString()]) then 
+	--means it's a number, ie. we saved the building's health earlier so it's not unique
+		ret:AddScript(string.format("Board:SetUniqueBuilding(%s, %q)", point:GetString(), mission.EncasedBuildings[point:GetString()]))
+		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
+	else
+		local currHealth = mission.EncasedBuildings[point:GetString()]:sub(1, 1)
+		local maxHealth = mission.EncasedBuildings[point:GetString()]:sub(2, 2)
+		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
+		ret:AddScript(string.format("Board:SetHealth(%s, %s, %s)", point:GetString(), currHealth, maxHealth))
+		
+		--this is because if we shield a building with 1 health left out of 2 and respawn it, we need to spawn a building with 2 max health
+	end
+	
+	return ret
+end
 
 --Tumblebug artillery: 
 --You can target things beyond something so it's not a two-click and it instead auto-selects the first thing in the line, so to speak
@@ -384,10 +469,23 @@ function Meta_TechnoTumblebugWeapon:IsTwoClickException(p1,p2)
 	local blockedTiles = 0
 	for dir = DIR_START, DIR_END do
 		local curr = p1 + DIR_VECTORS[dir]
-		if Board:GetTerrain(curr) == TERRAIN_WATER or Board:IsBuilding(curr) or Board:GetTerrain(curr) == TERRAIN_MOUNTAIN then blockedTiles = blockedTiles + 1 end
-		if Board:GetPawn(curr) and Board:GetPawn(curr):IsGuarding() then blockedTiles = blockedTiles + 1 end
+		
+		if Board:GetPawn(curr) then	
+			if Board:GetPawn(curr):IsGuarding() then 
+				blockedTiles = blockedTiles + 1 
+			else
+				local foundUnblocked = false
+				for i = 1, 6 do
+					if not Board:IsValid(curr + DIR_VECTORS[dir] * i) then break end
+					if not Board:IsBlocked(curr + DIR_VECTORS[dir] * i, PATH_PROJECTILE) then foundUnblocked = true break end
+				end
+				if not foundUnblocked then blockedTiles = blockedTiles + 1 end
+			end
+		elseif Board:GetTerrain(curr) == TERRAIN_WATER or Board:IsBuilding(curr) or Board:GetTerrain(curr) == TERRAIN_MOUNTAIN then 
+			blockedTiles = blockedTiles + 1
+		end
 	end
-	--quick and dirty, I may be missing a possibility
+	--I may be missing a possibility, but this covers pawns there is nowhere to throw to, stables, and blocking terrain
 	if blockedTiles >= 3 then return true end
 	if self.FreeThrow and Board:GetPawn(p1 + DIR_VECTORS[direction]) and _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial == IMPACT_ROCK then return false end
 	-- if not Board:IsBlocked(p2, PATH_PROJECTILE) then return false end	--we only do two click weapon stuff if there is a pawn in p2
@@ -403,9 +501,10 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 		damage.sPawn = self.ToSpawn
 		ret:AddMelee(p1,damage)
 		ret:AddDelay(0.5)
-	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) and not _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial == IMPACT_ROCK then
+	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) and _G[Board:GetPawn(p1 + DIR_VECTORS[direction]):GetType()].ImpactMaterial ~= IMPACT_ROCK then
 	--yeeting a non-rock pawn
 		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
+		fake_punch.sSound = self.LaunchSound
 		ret:AddMelee(p1,fake_punch)
 		local move = PointList()
 		move:push_back(p1+DIR_VECTORS[direction])
@@ -415,6 +514,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 	elseif Board:GetPawn(p1 + DIR_VECTORS[direction]) then
 	--yeeting an existing rock
 		local fake_punch = SpaceDamage(p1 + DIR_VECTORS[direction],0)
+		fake_punch.sSound = self.LaunchSound
 		ret:AddMelee(p1,fake_punch)
 		if not Board:IsBlocked(p2, PATH_PROJECTILE) then
 			local move = PointList()
@@ -436,7 +536,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				for dir = DIR_START, DIR_END do
 					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
 					exploDamage.sAnimation = "exploout2_"..dir --(dir+2)%4
-					ret:AddDamage(exploDamage)
+					if not Board:IsBuilding(p2 + DIR_VECTORS[dir]) then ret:AddDamage(exploDamage) end
 				end
 			else
 				damage.sAnimation = "rock1d" 
@@ -471,7 +571,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				for dir = DIR_START, DIR_END do
 					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
 					exploDamage.sAnimation = "exploout2_"..dir --(dir+2)%4
-					ret:AddDamage(exploDamage)
+					if not Board:IsBuilding(p2 + DIR_VECTORS[dir]) then ret:AddDamage(exploDamage) end
 				end
 			else
 				damage.sAnimation = "rock1d" 

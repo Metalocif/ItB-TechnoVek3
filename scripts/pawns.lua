@@ -217,6 +217,7 @@ Meta_TechnoMoth = Pawn:new{
 	Massive = true,
 	Corpse = true,
     Flying=true,
+	LargeShield = true,
 
 	-- reference the animations we set up earlier.
 	Image = "Meta_TechnoMoth",
