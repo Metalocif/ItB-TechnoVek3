@@ -159,9 +159,11 @@ function Move:GetSkillEffect(p1, p2, ...)
 
 		-- just preview move.
 		-- ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", pawnId))
-		if not Board:IsTerrain(p1, TERRAIN_WATER) and not Board:IsTerrain(p2, TERRAIN_WATER) then
+		if not Board:IsTerrain(p1, TERRAIN_WATER) and not Board:IsTerrain(p2, TERRAIN_WATER) and p1:Manhattan(p2) > 1 then
+		--it's annoying to go through the whole burrowing animation for one tile so we force a normal Move
+		--could probably check whether it's possible to move to p2 without burrowing but this helps a little
 			ret:AddBurrow(Board:GetPath(p1, p2, PATH_FLYER), NO_DELAY)
-			ret:AddDelay(1)
+			ret:AddDelay(0.7)
 			local path = extract_table(Board:GetPath(p1, p2, PATH_FLYER))
 			local dist = #path - 1
 			for i = 1, #path do

@@ -9,6 +9,9 @@
 local resourcePath = mod_loader.mods[modApi.currentMod].resourcePath
 modApi:appendAsset("img/weapons/ranged_mothweapon.png", resourcePath.."img/weapons/ranged_mothweapon.png")
 modApi:appendAsset("img/effects/upshot_bombrock.png", resourcePath.."img/effects/upshot_bombrock.png")
+modApi:appendAsset("img/effects/upshot_acidfirerock.png", resourcePath.."img/effects/upshot_acidfirerock.png")
+modApi:appendAsset("img/effects/upshot_acidrock.png", resourcePath.."img/effects/upshot_acidrock.png")
+modApi:appendAsset("img/effects/upshot_firerock.png", resourcePath.."img/effects/upshot_firerock.png")
 modApi:appendAsset("img/units/player/encasedbuilding.png", resourcePath.."img/units/player/encasedbuilding.png")
 modApi:appendAsset("img/units/player/encasedbuilding_d.png", resourcePath.."img/units/player/encasedbuilding_d.png")
 modApi:appendAsset("img/units/player/encasedbuilding_e.png", resourcePath.."img/units/player/encasedbuilding_e.png")
@@ -57,7 +60,11 @@ function Meta_TechnoMothWeapon:GetTargetArea(point)
 	if self.TwoClick then
 		ret:push_back(point)
 		for dir = DIR_START, DIR_END do
-			if not (Board:GetPawn(point + DIR_VECTORS[dir]) and not Board:GetPawn(point + DIR_VECTORS[dir]):IsGuarding()) and not Board:IsBlocked(point + DIR_VECTORS[dir] * 2, PATH_PROJECTILE) then ret:push_back(point + DIR_VECTORS[dir] * 2) end
+			if not (Board:GetPawn(point + DIR_VECTORS[dir]) and not Board:GetPawn(point + DIR_VECTORS[dir]):IsGuarding()) and --no pushable pawn 
+			not Board:IsBlocked(point + DIR_VECTORS[dir] * 2, PATH_PROJECTILE) and --nothing blocking the tile
+			Board:GetPawn(point):GetMoveSpeed() >= 2 then --not webbed
+				ret:push_back(point + DIR_VECTORS[dir] * 2) 
+			end
 			for k = 3, Board:GetPawn(point):GetMoveSpeed() do
 				local curr = point + DIR_VECTORS[dir] * k
 				if not Board:IsBlocked(curr,PATH_PROJECTILE) then ret:push_back(curr) end
@@ -104,7 +111,7 @@ function Meta_TechnoMothWeapon:GetSkillEffect(p1,p2)
 		ret:AddLeap(move,FULL_DELAY)
 	else
 		local damage = SpaceDamage(p2, self.Damage, direction)
-		damage.sAnimation = "ExploArt2"
+		damage.sAnimation = "ExploArt"..self.Damage
 		ret:AddArtillery(damage, self.UpShot)
 		
 		for dir = DIR_START, DIR_END do
@@ -138,7 +145,7 @@ function Meta_TechnoMothWeapon:GetFinalEffect(p1,p2,p3)
 		ret:AddDamage(damage)
 	end
 	local damage = SpaceDamage(p3, self.Damage, direction)
-	damage.sAnimation = "ExploArt2"
+	damage.sAnimation = "ExploArt"..self.Damage
 	ret:AddArtillery(p2, damage, self.UpShot)
 	
 	
@@ -376,8 +383,6 @@ function EncasedBuilding:GetDeathEffect(point)
 		local maxHealth = mission.EncasedBuildings[point:GetString()]:sub(2, 2)
 		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
 		ret:AddScript(string.format("Board:SetHealth(%s, %s, %s)", point:GetString(), currHealth, maxHealth))
-		
-		--this is because if we shield a building with 1 health left out of 2 and respawn it, we need to spawn a building with 2 max health
 	end
 	
 	return ret
@@ -399,10 +404,8 @@ Meta_TechnoTumblebugWeapon = Skill:new{
 	Class = "TechnoVek",
 	Icon = "weapons/prime_rock.png",	--unused sprite afaict
 	Rarity = 3,
-	UpShot = "effects/shotup_ignite_fireball.png",
-	PowerCost = 0, --AE Change
+	PowerCost = 0,
 	Damage = 1,
-	Range = 3,
 	TwoClick = true,
 	Upgrades = 2,
 	UpgradeCost = {1,2},
@@ -521,12 +524,24 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			move:push_back(p1+DIR_VECTORS[direction])
 			move:push_back(p2)
 			ret:AddLeap(move, FULL_DELAY)
-			ret:AddDamage(SpaceDamage(p2, 1))
+			if _G[Board:GetPawn(p2):GetType()].Explodes then ret:AddDamage(SpaceDamage(p2, 1)) end
 		else
 			local rockID = Board:GetPawn(p1 + DIR_VECTORS[direction]):GetId()
 			local damage = SpaceDamage(p2, Board:GetPawn(rockID):GetMaxHealth() * 2)
-			if Board:GetPawn(rockID):IsFire() then damage.iFire = EFFECT_CREATE end
-			if Board:GetPawn(rockID):IsAcid() then damage.iAcid = EFFECT_CREATE end
+			local visual
+			if Board:GetPawn(rockID):IsAcid() and Board:GetPawn(rockID):IsFire() then 
+				visual = "effects/upshot_acidfirerock.png"
+				damage.iAcid = EFFECT_CREATE 
+				damage.iFire = EFFECT_CREATE 
+			elseif Board:GetPawn(rockID):IsAcid() then 
+				damage.iAcid = EFFECT_CREATE 
+				visual = "effects/upshot_acidrock.png"
+			elseif Board:GetPawn(rockID):IsFire() then 
+				damage.iFire = EFFECT_CREATE 
+				visual = "effects/upshot_firerock.png"
+			else
+				visual = "effects/shotdown_rock.png"
+			end
 			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", Point(p1 + DIR_VECTORS[direction]):GetString()))
 			if _G[Board:GetPawn(rockID):GetType()].Explodes then
 				damage.iDamage = damage.iDamage + 1 
@@ -540,7 +555,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				end
 			else
 				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/shotdown_rock.png")
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage, visual)
 			end
 		end
 		ret:AddBounce(p2,3)
@@ -560,8 +575,20 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			ret:AddDamage(SpaceDamage(p2, 1))
 		else
 			local damage = SpaceDamage(p2, 2)
-			if Board:IsFire(p1 + DIR_VECTORS[direction]) then damage.iFire = EFFECT_CREATE end
-			if Board:IsAcid(p1 + DIR_VECTORS[direction]) then damage.iAcid = EFFECT_CREATE end
+			local visual
+			if Board:IsAcid(p1 + DIR_VECTORS[direction]) and Board:IsFire(p1 + DIR_VECTORS[direction]) then 
+				visual = "effects/upshot_acidfirerock.png"
+				damage.iAcid = EFFECT_CREATE 
+				damage.iFire = EFFECT_CREATE 
+			elseif Board:IsAcid(p1 + DIR_VECTORS[direction]) then 
+				damage.iAcid = EFFECT_CREATE 
+				visual = "effects/upshot_acidrock.png"
+			elseif Board:IsFire(p1 + DIR_VECTORS[direction]) then 
+				damage.iFire = EFFECT_CREATE 
+				visual = "effects/upshot_firerock.png"
+			else
+				visual = "effects/shotdown_rock.png"
+			end
 			ret:AddScript(string.format("Board:GetPawn(%s):SetSpace(Point(-1, -1))", Point(p1 + DIR_VECTORS[direction]):GetString()))
 			if self.ToSpawn == "BombRock" then
 				damage.iDamage = damage.iDamage + 1 
@@ -575,7 +602,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				end
 			else
 				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/shotdown_rock.png")
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,visual)
 			end
 		end
 		ret:AddBounce(p2,3)
