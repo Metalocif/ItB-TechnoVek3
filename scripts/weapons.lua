@@ -572,7 +572,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			move:push_back(p1+DIR_VECTORS[direction])
 			move:push_back(p2)
 			ret:AddLeap(move, FULL_DELAY)
-			ret:AddDamage(SpaceDamage(p2, 1))
+			if _G[Board:GetPawn(p2):GetType()].Explodes then ret:AddDamage(SpaceDamage(p2, 1)) end
 		else
 			local damage = SpaceDamage(p2, 2)
 			local visual
