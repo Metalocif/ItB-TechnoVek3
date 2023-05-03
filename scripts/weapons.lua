@@ -94,11 +94,17 @@ function Meta_TechnoMothWeapon:GetSecondTargetArea(p1, p2)
 	return ret
 end
 
+function Meta_TechnoMothWeapon:IsTwoClickException(p1,p2)
+	if Board:GetPawn(p1):GetMoveSpeed() < 2 then return true end
+	return false
+end
+
+
 function Meta_TechnoMothWeapon:GetSkillEffect(p1,p2)
 	local ret = SkillEffect()
 	local direction = GetDirection(p2-p1)
 	ret:AddBounce(p1, 1)
-	if self.TwoClick then
+	if self.TwoClick and Board:GetPawn(p1):GetMoveSpeed() >= 2 then
 		for dir = DIR_START, DIR_END do
 			damage = SpaceDamage(p1 + DIR_VECTORS[dir], 0, dir)
 			damage.sAnimation = "airpush_"..dir
@@ -146,7 +152,7 @@ function Meta_TechnoMothWeapon:GetFinalEffect(p1,p2,p3)
 	end
 	local damage = SpaceDamage(p3, self.Damage, direction)
 	damage.sAnimation = "ExploArt"..self.Damage
-	ret:AddArtillery(p2, damage, self.UpShot)
+	ret:AddArtillery(p2, damage, self.UpShot, PROJ_DELAY)
 	
 	
 	ret:AddBounce(p3, 2)
@@ -201,7 +207,7 @@ Meta_TechnoDiggerWeapon = Skill:new{
 	Damage = 1,
 	Range  = 1,
 	Upgrades = 2,
-	UpgradeCost = {2,2},
+	UpgradeCost = {2,1},
 	UpgradeList = { "Hard Rocks", "Encase Building"  },
 	ToSpawn = "Wall",
 	Shrapnel = false,
@@ -255,8 +261,6 @@ function Meta_TechnoDiggerWeapon:GetSkillEffect(p1,p2)
 					mission.EncasedBuildings[curr:GetString()] = Board:GetHealth(curr) .. Board:GetMaxHealth(curr) 
 					--we store both current and max HP so we can remake a half-destroyed building later
 				end
-				--mission.EncasedBuildings[curr:GetString()] = tostring(Board:GetUniqueBuilding(curr)) or Board:GetHealth(curr)
-				--for some reason the above doesn't work, I imagine because tostring(nil) ~= nil
 				damage.iTerrain = 0
 				damage.sPawn = "EncasedBuilding"
 				ret:AddDamage(damage)
@@ -374,15 +378,15 @@ function EncasedBuilding:GetDeathEffect(point)
 	local ret = SkillEffect()
 	local mission = GetCurrentMission()
 	--check string is number, if yes spawn normal building & set health
-	if not tonumber(mission.EncasedBuildings[point:GetString()]) then 
-	--means it's a number, ie. we saved the building's health earlier so it's not unique
-		ret:AddScript(string.format("Board:SetUniqueBuilding(%s, %q)", point:GetString(), mission.EncasedBuildings[point:GetString()]))
-		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
-	else
+	if tonumber(mission.EncasedBuildings[point:GetString()]) then 
+		--means it's a number, ie. we saved the building's health earlier so it's not unique
 		local currHealth = mission.EncasedBuildings[point:GetString()]:sub(1, 1)
 		local maxHealth = mission.EncasedBuildings[point:GetString()]:sub(2, 2)
 		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
 		ret:AddScript(string.format("Board:SetHealth(%s, %s, %s)", point:GetString(), currHealth, maxHealth))
+	else
+		ret:AddScript(string.format("Board:SetUniqueBuilding(%s, %q)", point:GetString(), mission.EncasedBuildings[point:GetString()]))
+		ret:AddScript(string.format("Board:SetTerrain(%s, TERRAIN_BUILDING)", point:GetString()))
 	end
 	
 	return ret
@@ -391,7 +395,7 @@ end
 --Tumblebug artillery: 
 --You can target things beyond something so it's not a two-click and it instead auto-selects the first thing in the line, so to speak
 --This deals one damage to the rock, it acts like the rock artillery, pushing sides
---Wall1 deals 2, Wall2 deals 4, BombRock deals 5
+--Wall1 deals 2, Wall2 deals 4, BombRock deals 3
 
 -------------
 --Tumblebug--
@@ -399,7 +403,6 @@ end
 
 Meta_TechnoTumblebugWeapon = Skill:new{
 	Name = "Mineral Prize",
-	Self = "Meta_TechnoTumblebugWeapon",
 	Description = "Dig up a rock, then toss an adjacent target.",
 	Class = "TechnoVek",
 	Icon = "weapons/prime_rock.png",	--unused sprite afaict
@@ -524,10 +527,13 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			move:push_back(p1+DIR_VECTORS[direction])
 			move:push_back(p2)
 			ret:AddLeap(move, FULL_DELAY)
-			if _G[Board:GetPawn(p2):GetType()].Explodes then ret:AddDamage(SpaceDamage(p2, 1)) end
+			ret:AddSound(self.ImpactSound)
+			if _G[Board:GetPawn(p1+DIR_VECTORS[direction]):GetType()].Explodes then ret:AddDamage(SpaceDamage(p2, 1)) end
 		else
 			local rockID = Board:GetPawn(p1 + DIR_VECTORS[direction]):GetId()
 			local damage = SpaceDamage(p2, Board:GetPawn(rockID):GetMaxHealth() * 2)
+			damage.fDelay = -1
+			damage.sSound = self.ImpactSound
 			local visual
 			if Board:GetPawn(rockID):IsAcid() and Board:GetPawn(rockID):IsFire() then 
 				visual = "effects/upshot_acidfirerock.png"
@@ -546,7 +552,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			if _G[Board:GetPawn(rockID):GetType()].Explodes then
 				damage.iDamage = damage.iDamage + 1 
 				damage.sAnimation = "rock2d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png")
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png", PROJ_DELAY)
 				ret:AddDelay(0.1)
 				for dir = DIR_START, DIR_END do
 					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
@@ -555,7 +561,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				end
 			else
 				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage, visual)
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage, visual, PROJ_DELAY)
 			end
 		end
 		ret:AddBounce(p2,3)
@@ -572,9 +578,12 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			move:push_back(p1+DIR_VECTORS[direction])
 			move:push_back(p2)
 			ret:AddLeap(move, FULL_DELAY)
-			if _G[Board:GetPawn(p2):GetType()].Explodes then ret:AddDamage(SpaceDamage(p2, 1)) end
+			ret:AddSound(self.ImpactSound)
+			if self.ToSpawn == "BombRock" then ret:AddDamage(SpaceDamage(p2, 1)) end
 		else
 			local damage = SpaceDamage(p2, 2)
+			damage.fDelay = -1
+			damage.sSound = self.ImpactSound
 			local visual
 			if Board:IsAcid(p1 + DIR_VECTORS[direction]) and Board:IsFire(p1 + DIR_VECTORS[direction]) then 
 				visual = "effects/upshot_acidfirerock.png"
@@ -593,7 +602,7 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 			if self.ToSpawn == "BombRock" then
 				damage.iDamage = damage.iDamage + 1 
 				damage.sAnimation = "rock2d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png")
+				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,"effects/upshot_bombrock.png", PROJ_DELAY)
 				ret:AddDelay(0.1)
 				for dir = DIR_START, DIR_END do
 					local exploDamage = SpaceDamage(p2 + DIR_VECTORS[dir], 1)
@@ -602,7 +611,8 @@ function Meta_TechnoTumblebugWeapon:TossStuff(ret, p1, p2)
 				end
 			else
 				damage.sAnimation = "rock1d" 
-				ret:AddArtillery(p1 + DIR_VECTORS[direction],damage,visual)
+				-- ret:AddArtillery(p1 + DIR_VECTORS[direction], damage, visual, -1)
+				ret:AddArtillery(p1 + DIR_VECTORS[direction], damage, visual, PROJ_DELAY)
 			end
 		end
 		ret:AddBounce(p2,3)
@@ -630,17 +640,14 @@ end
 Meta_TechnoTumblebugWeapon_A = Meta_TechnoTumblebugWeapon:new{
 	ToSpawn = "BombRock",
 	UpgradeDescription = "Digs up explosive rocks. They deal extra damage if thrown on top of units.",
-	Self = "Meta_TechnoTumblebugWeapon_A",
 }
 
 Meta_TechnoTumblebugWeapon_B = Meta_TechnoTumblebugWeapon:new{
 	FreeThrow = true,
 	UpgradeDescription = "If the target is an existing rock, a secondary target can be selected.",
-	Self = "Meta_TechnoTumblebugWeapon_B",
 }
 			
 Meta_TechnoTumblebugWeapon_AB = Meta_TechnoTumblebugWeapon:new{
 	ToSpawn = "BombRock",
 	FreeThrow = true,
-	Self = "Meta_TechnoTumblebugWeapon_AB",
 }

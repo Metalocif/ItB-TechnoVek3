@@ -133,7 +133,9 @@ local oldMove = Move.GetTargetArea
 function Move:GetTargetArea(p, ...)
 	local mover = Board:GetPawn(p)
 	if mover and (mover:GetType() == "Meta_TechnoDigger" or mover:GetType() == "Meta_TechnoTumblebug") then
-		local old = extract_table(Board:GetReachable(p, mover:GetMoveSpeed(), PATH_FLYER))
+		local pathType
+		if Board:GetTerrain(p) == TERRAIN_WATER then pathType = PATH_MASSIVE else pathType = PATH_FLYER end
+		local old = extract_table(Board:GetReachable(p, mover:GetMoveSpeed(), pathType))
 		local ret = PointList()
 
 		for _, v in ipairs(old) do
@@ -211,6 +213,21 @@ Meta_TechnoTumblebug = Pawn:new{
 }
 AddPawn("Meta_TechnoTumblebug")
 
+modApi:addPalette({
+    ID = "Meta_Moth",
+    Name = "Alpha Vek Steel Brown",
+    Image = "units/player/Meta_TechnoMoth_ns.png",
+    PlateHighlight = {255,226,171},
+    PlateLight     = {139, 121, 164},
+    PlateMid       = {85, 88, 112},
+    PlateDark      = {36, 41, 65},
+    PlateOutline   = {12,19,31},
+    PlateShadow    = {60,87,89},
+    BodyColor      = {69,116,98},
+    BodyHighlight  = {79,146,107},
+    }
+)
+
 Meta_TechnoMoth = Pawn:new{
 	Name = "Techno-Moth",
 	Class = "TechnoVek",
@@ -226,8 +243,8 @@ Meta_TechnoMoth = Pawn:new{
 
 	-- ImageOffset specifies which color scheme we will be using.
 	-- (only apporpirate if you draw your mechs with Archive olive green colors)
-	ImageOffset = 8,
-
+	-- ImageOffset = 8,
+	ImageOffset = modApi:getPaletteImageOffset("Meta_Moth"),
 	-- Any weapons this mech should start with goes in this table.
 	SkillList = {"Meta_TechnoMothWeapon"},
 
