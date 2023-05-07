@@ -134,7 +134,7 @@ function Move:GetTargetArea(p, ...)
 	local mover = Board:GetPawn(p)
 	if mover and (mover:GetType() == "Meta_TechnoDigger" or mover:GetType() == "Meta_TechnoTumblebug") then
 		local pathType
-		if Board:GetTerrain(p) == TERRAIN_WATER then pathType = PATH_MASSIVE else pathType = PATH_FLYER end
+		if Board:GetTerrain(p) == TERRAIN_WATER then pathType = mover:GetPathProf() else pathType = PATH_FLYER end
 		local old = extract_table(Board:GetReachable(p, mover:GetMoveSpeed(), pathType))
 		local ret = PointList()
 
@@ -165,7 +165,8 @@ function Move:GetSkillEffect(p1, p2, ...)
 		--it's annoying to go through the whole burrowing animation for one tile so we force a normal Move
 		--could probably check whether it's possible to move to p2 without burrowing but this helps a little
 			ret:AddBurrow(Board:GetPath(p1, p2, PATH_FLYER), NO_DELAY)
-			ret:AddDelay(0.7)
+			ret:AddSound("/enemy/shared/crawl_out")
+			ret:AddDelay(0.7)	--burrowing anim duration
 			local path = extract_table(Board:GetPath(p1, p2, PATH_FLYER))
 			local dist = #path - 1
 			for i = 1, #path do
