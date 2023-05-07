@@ -458,7 +458,7 @@ function Meta_TechnoTumblebugWeapon:GetSecondTargetArea(p1, p2)
 	local ret = PointList()
 	for i = DIR_START, DIR_END do
 		local curr = p1 + DIR_VECTORS[i]
-		if not Board:IsBlocked(curr, PATH_GROUND) then ret:push_back(curr) end
+		if not Board:IsBlocked(curr, PATH_GROUND) and curr ~= p2 then ret:push_back(curr) end
 		if Board:GetPawn(curr) and not Board:GetPawn(curr):IsGuarding() then --and _G[Board:GetPawn(curr):GetType()].ImpactMaterial == IMPACT_ROCK then
 			for j = 2, 7 do
 				local curr2 = p1 + DIR_VECTORS[i] * j
